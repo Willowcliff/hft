@@ -51,3 +51,4 @@ Dashboard:
 - `MIN_COPY_PRICE` lets you ignore low-priced entries (for example `0.24` skips source/book prices below 24 cents).
 - By default this is conservative and skips stale books, wide spreads, and low-quality markets.
 - Keep `DRY_RUN=true` until you confirm logs, sizing, and dashboard behavior.
+"# hft" 

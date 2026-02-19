@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Copy Trader Command Deck</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+    <style>
+      :root {
+        --bg: #070c18;
+        --bg2: #0d1830;
+        --panel: #111b31cc;
+        --panel2: #0f1a30;
+        --line: #20345a;
+        --text: #e7efff;
+        --muted: #8fa8d4;
+        --accent: #38b7ff;
+        --profit: #28cf7b;
+        --loss: #ff6282;
+        --warn: #ffc870;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Space Grotesk", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(1100px 580px at -8% -8%, #3eb9ff3a, transparent 65%),
+          radial-gradient(1200px 630px at 110% -10%, #6670ff32, transparent 67%),
+          linear-gradient(140deg, #060a13, var(--bg), var(--bg2));
+      }
+      .app { width: min(1540px, 95vw); margin: 18px auto 28px; }
+      .top {
+        display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; margin-bottom: 10px;
+      }
+      .eyebrow { margin: 0 0 6px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+      h1 { margin: 0; font-size: clamp(1.5rem, 2.2vw, 2.2rem); }
+      .sub { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+      .chips { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+      .chip {
+        background: #132341; border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; font-size: 11px; color: var(--muted);
+        display: inline-flex; align-items: center; gap: 8px;
+      }
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--profit); animation: pulse 2.3s infinite; box-shadow: 0 0 0 0 #28cf7b88; }
+      @keyframes pulse { 80% { box-shadow: 0 0 0 10px #28cf7b00; } 100% { box-shadow: 0 0 0 0 #28cf7b00; } }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        box-shadow: 0 24px 56px -36px #000;
+      }
+      .panel-head {
+        padding: 10px 12px; border-bottom: 1px solid #1c2f51; display: flex; justify-content: space-between; align-items: center;
+      }
+      .panel-head h2 { margin: 0; font-size: 14px; }
+      .panel-note { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+
+      .controls-wrap { padding: 10px 12px 12px; margin-bottom: 12px; }
+      .controls {
+        display: grid; gap: 8px; grid-template-columns: 1.4fr auto auto auto auto;
+      }
+      .field,.sel,.btn {
+        height: 38px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel2); color: var(--text); padding: 0 12px;
+        font-family: "Space Grotesk", sans-serif; font-size: 13px;
+      }
+      .field::placeholder { color: #7590bc; }
+      .btn { cursor: pointer; font-weight: 600; }
+      .btn:hover { border-color: #315189; }
+      .btn.primary { background: linear-gradient(145deg, var(--accent), #5d72ff); color: #061224; border-color: transparent; }
+      .bar-track { height: 3px; margin-top: 10px; background: #13223d; border-radius: 3px; overflow: hidden; }
+      .bar { height: 100%; background: linear-gradient(90deg, var(--accent), #6f7fff); transform-origin: left; }
+      @keyframes countdown { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+      .cards {
+        display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); margin-bottom: 12px;
+      }
+      .card { padding: 11px 12px; }
+      .k { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+      .v { font-size: 1.08rem; font-weight: 700; }
+      .pos { color: var(--profit); }
+      .neg { color: var(--loss); }
+
+      .grid {
+        display: grid; gap: 12px; grid-template-columns: 1.8fr 1fr; margin-bottom: 12px;
+      }
+      .stack { display: grid; gap: 12px; grid-template-rows: 1fr 1fr; }
+      #equityChart { width: 100%; height: 340px; }
+      #allocationChart,#pnlChart { width: 100%; height: 190px; }
+
+      .perf { display: grid; gap: 8px; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 10px 12px 12px; margin-bottom: 12px; }
+      .perf-item { border: 1px solid var(--line); border-radius: 10px; background: #0e1a30; padding: 8px 9px; }
+      .perf-k { font-size: 10px; color: var(--muted); letter-spacing: .07em; text-transform: uppercase; }
+      .perf-v { margin-top: 4px; font: 700 13px "JetBrains Mono", monospace; }
+
+      .tables { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+      .table-wrap { max-height: 430px; overflow: auto; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      thead th {
+        position: sticky; top: 0; z-index: 1; background: #12203a; color: #9eb4d8; font-size: 10px;
+        text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid var(--line);
+      }
+      th,td { padding: 8px 9px; text-align: left; border-bottom: 1px solid #162640; vertical-align: top; }
+      tbody tr:hover { background: #0f1f38; }
+      .num { font-family: "JetBrains Mono", monospace; }
+      .market { max-width: 260px; }
+      .subt { margin-top: 2px; color: var(--muted); font-size: 10px; }
+      .badge,.tag {
+        border-radius: 999px; display: inline-flex; padding: 2px 8px; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700;
+      }
+      .buy { background: #28cf7b29; color: var(--profit); }
+      .sell { background: #ff62822b; color: var(--loss); }
+      .open { background: #38b7ff29; color: var(--accent); }
+      .win { background: #28cf7b29; color: var(--profit); }
+      .loss { background: #ff62822b; color: var(--loss); }
+      .flat { background: #8fa8d433; color: #b7caeb; }
+      .empty { text-align: center; color: var(--muted); padding: 12px; }
+      .error { margin-top: 12px; border: 1px solid #534124; background: #ffc87014; color: var(--warn); border-radius: 10px; padding: 9px 10px; font-size: 12px; }
+
+      @media (max-width: 1220px) {
+        .grid { grid-template-columns: 1fr; }
+        .stack { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
+      }
+      @media (max-width: 980px) {
+        .tables { grid-template-columns: 1fr; }
+        .controls { grid-template-columns: 1fr 1fr; }
+        .perf { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+      @media (max-width: 680px) {
+        .app { width: 96vw; }
+        .top { flex-direction: column; }
+        .chips { justify-content: flex-start; }
+        .controls { grid-template-columns: 1fr; }
+        .stack { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <header class="top">
+        <div>
+          <p class="eyebrow">Polymarket / Dark Command Deck</p>
+          <h1>Copy Trader Command Deck</h1>
+          <p class="sub">Dark-mode only dashboard with refresh controls, filters, analytics, and charted trade distributions.</p>
+        </div>
+        <div class="chips">
+          <div class="chip"><span class="dot"></span><span id="connectionText">Live stream</span></div>
+          <div class="chip">Updated <span id="lastUpdated">-</span></div>
+          <div class="chip">Mode <span id="modeText">-</span></div>
+        </div>
+      </header>
+
+      <section class="panel controls-wrap">
+        <div class="controls">
+          <input id="marketFilter" class="field" type="text" placeholder="Filter by market, side, reason, outcome..." />
+          <select id="refreshSelect" class="sel">
+            <option value="1000">1s refresh</option>
+            <option value="2500" selected>2.5s refresh</option>
+            <option value="5000">5s refresh</option>
+            <option value="10000">10s refresh</option>
+          </select>
+          <button id="refreshToggle" class="btn">Pause Auto</button>
+          <button id="manualRefresh" class="btn">Refresh Now</button>
+          <button id="exportCsv" class="btn primary">Export Resolved CSV</button>
+        </div>
+        <div class="bar-track"><div id="refreshBar" class="bar"></div></div>
+      </section>
+
+      <section id="cards" class="cards"></section>
+
+      <section class="grid">
+        <article class="panel">
+          <div class="panel-head"><h2>Equity Curve</h2><span class="panel-note">Realized + Unrealized</span></div>
+          <div id="equityChart"></div>
+        </article>
+        <div class="stack">
+          <article class="panel">
+            <div class="panel-head"><h2>Open Allocation</h2><span class="panel-note">Buy vs Sell</span></div>
+            <div id="allocationChart"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-head"><h2>Resolved PnL Distribution</h2><span class="panel-note">Histogram</span></div>
+            <div id="pnlChart"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" style="margin-bottom: 12px">
+        <div class="panel-head"><h2>Performance Analytics</h2><span class="panel-note">Derived from resolved trades</span></div>
+        <div id="performance" class="perf"></div>
+      </section>
+
+      <section class="tables">
+        <article class="panel">
+          <div class="panel-head"><h2>Open Positions</h2><span id="openCount" class="panel-note">0 rows</span></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>ID</th><th>Market</th><th>Side</th><th>Size</th><th>Entry</th><th>Mark</th><th>Unrealized</th><th>Status</th></tr></thead>
+              <tbody id="openBody"></tbody>
+            </table>
+          </div>
+        </article>
+        <article class="panel">
+          <div class="panel-head"><h2>Resolved Positions</h2><span id="resolvedCount" class="panel-note">0 rows</span></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>ID</th><th>Market</th><th>Side</th><th>Entry</th><th>Exit</th><th>Realized</th><th>Reason</th><th>Result</th></tr></thead>
+              <tbody id="resolvedBody"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <div id="errorBanner" class="error" hidden></div>
+    </main>
+
+    <script>
+      const state = { overview: null, open: [], resolved: [], equity: [], refreshMs: 2500, paused: false, timer: null };
+
+      const fmtFixed = (n, d = 4) => (n == null || Number.isNaN(Number(n)) ? "-" : Number(n).toFixed(d));
+      const fmtMoney = (n) => (n == null || Number.isNaN(Number(n)) ? "-" : `$${Number(n).toFixed(2)}`);
+      const fmtPct = (n) => (n == null || Number.isNaN(Number(n)) ? "-" : `${Number(n).toFixed(2)}%`);
+      const short = (s, n = 58) => (s && s.length > n ? `${s.slice(0, n)}...` : s || "-");
+      const pnlClass = (n) => (Number(n) >= 0 ? "pos" : "neg");
+      const localTime = (iso) => {
+        if (!iso) return "-";
+        const d = new Date(iso);
+        return Number.isNaN(d.getTime()) ? "-" : d.toLocaleTimeString();
+      };
+
+      const sideBadge = (side) =>
+        side === "SELL" ? '<span class="badge sell">Sell</span>' : '<span class="badge buy">Buy</span>';
+      const resultTag = (result) =>
+        result === "WIN"
+          ? '<span class="tag win">Win</span>'
+          : result === "LOSS"
+            ? '<span class="tag loss">Loss</span>'
+            : '<span class="tag flat">Flat</span>';
+
+      function renderCards() {
+        const o = state.overview || {};
+        const cards = [
+          ["Wallet USDC", fmtMoney(o.live_usdc_balance), null],
+          ["Equity", fmtMoney(o.equity), null],
+          ["Realized PnL", fmtMoney(o.realized_pnl), o.realized_pnl],
+          ["Unrealized PnL", fmtMoney(o.unrealized_pnl), o.unrealized_pnl],
+          ["Return", fmtPct(o.total_return_pct), o.total_return_pct],
+          ["Win Rate", fmtPct(o.win_rate_pct), null],
+          ["Max Drawdown", fmtPct(o.max_drawdown_pct), null],
+          ["Tracked Assets", o.tracked_assets ?? "-", null],
+          ["Open", o.open_positions ?? "-", null],
+          ["Resolved", o.resolved_positions ?? "-", null]
+        ];
+        document.getElementById("cards").innerHTML = cards
+          .map(([k, v, t]) => `<div class="panel card"><div class="k">${k}</div><div class="v ${t == null ? "" : Number(t) >= 0 ? "pos" : "neg"}">${v}</div></div>`)
+          .join("");
+      }
+
+      function renderEquity() {
+        const pts = state.equity || [];
+        if (!pts.length) {
+          Plotly.react("equityChart", [], { paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)", margin: { l: 44, r: 16, t: 8, b: 34 }, annotations: [{ text: "Waiting for equity data...", showarrow: false, x: 0.5, y: 0.5, font: { color: "#8fa8d4" } }] }, { responsive: true, displayModeBar: false });
+          return;
+        }
+        const x = pts.map((p) => p.timestamp);
+        const y = pts.map((p) => p.equity);
+        const up = y[y.length - 1] >= y[0];
+        Plotly.react(
+          "equityChart",
+          [{ x, y, mode: "lines", line: { color: up ? "#28cf7b" : "#ff6282", width: 2.2 }, fill: "tozeroy", fillcolor: up ? "rgba(40,207,123,.15)" : "rgba(255,98,130,.15)", hovertemplate: "Time: %{x}<br>Equity: %{y:.4f}<extra></extra>" }],
+          { paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)", margin: { l: 44, r: 16, t: 8, b: 34 }, font: { color: "#8fa8d4" }, xaxis: { showgrid: false, tickfont: { size: 10 } }, yaxis: { gridcolor: "#1d2f54", zeroline: false, tickfont: { size: 10 } } },
+          { responsive: true, displayModeBar: false }
+        );
+      }
+
+      function renderAllocation() {
+        const open = state.open || [];
+        const buy = open.filter((x) => x.side === "BUY").reduce((a, b) => a + (Number(b.entry_notional) || 0), 0);
+        const sell = open.filter((x) => x.side === "SELL").reduce((a, b) => a + (Number(b.entry_notional) || 0), 0);
+        if (buy + sell <= 0) {
+          Plotly.react("allocationChart", [], { paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)", margin: { l: 0, r: 0, t: 8, b: 0 }, annotations: [{ text: "No open exposure", showarrow: false, x: 0.5, y: 0.5, font: { color: "#8fa8d4" } }] }, { responsive: true, displayModeBar: false });
+          return;
+        }
+        Plotly.react(
+          "allocationChart",
+          [{ values: [buy, sell], labels: ["Buy", "Sell"], type: "pie", hole: .64, marker: { colors: ["#28cf7b", "#ff6282"] }, textinfo: "label+percent", textfont: { color: "#dce9ff", size: 11 }, hovertemplate: "%{label}: %{value:.2f}<extra></extra>" }],
+          { paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)", showlegend: false, margin: { l: 10, r: 10, t: 4, b: 4 } },
+          { responsive: true, displayModeBar: false }
+        );
+      }
+
+      function renderPnlDist() {
+        const vals = (state.resolved || []).map((r) => Number(r.realized_pnl) || 0);
+        if (!vals.length) {
+          Plotly.react("pnlChart", [], { paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)", margin: { l: 36, r: 10, t: 8, b: 28 }, annotations: [{ text: "No resolved trades", showarrow: false, x: 0.5, y: 0.5, font: { color: "#8fa8d4" } }] }, { responsive: true, displayModeBar: false });
+          return;
+        }
+        Plotly.react(
+          "pnlChart",
+          [{ x: vals, type: "histogram", marker: { color: "#38b7ff" }, opacity: .86, nbinsx: 26, hovertemplate: "Count: %{y}<br>PnL: %{x:.3f}<extra></extra>" }],
+          { paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)", margin: { l: 38, r: 10, t: 8, b: 28 }, font: { color: "#8fa8d4" }, xaxis: { gridcolor: "#1d2f54", zeroline: false, tickfont: { size: 10 } }, yaxis: { gridcolor: "#1d2f54", zeroline: false, tickfont: { size: 10 } } },
+          { responsive: true, displayModeBar: false }
+        );
+      }
+
+      function perfStats() {
+        const rows = state.resolved || [];
+        if (!rows.length) return { pf: "-", exp: "-", aw: "-", al: "-", best: "-", worst: "-", streak: "-", payoff: "-" };
+        const pnls = rows.map((r) => Number(r.realized_pnl) || 0);
+        const wins = pnls.filter((x) => x > 0);
+        const losses = pnls.filter((x) => x < 0);
+        const grossW = wins.reduce((a, b) => a + b, 0);
+        const grossL = Math.abs(losses.reduce((a, b) => a + b, 0));
+        const aw = wins.length ? grossW / wins.length : 0;
+        const al = losses.length ? losses.reduce((a, b) => a + b, 0) / losses.length : 0;
+        const pf = grossL > 0 ? grossW / grossL : grossW > 0 ? Infinity : 0;
+        const payoff = al !== 0 ? Math.abs(aw / al) : Infinity;
+        let s = 0, sign = 0;
+        for (const p of pnls) {
+          const d = p > 0 ? 1 : p < 0 ? -1 : 0;
+          if (s === 0) { s = 1; sign = d; continue; }
+          if (d === sign) s += 1; else break;
+        }
+        return { pf: pf === Infinity ? "∞" : pf.toFixed(2), exp: fmtMoney(pnls.reduce((a, b) => a + b, 0) / pnls.length), aw: fmtMoney(aw), al: fmtMoney(al), best: fmtMoney(Math.max(...pnls)), worst: fmtMoney(Math.min(...pnls)), streak: sign > 0 ? `W${s}` : sign < 0 ? `L${s}` : `F${s}`, payoff: payoff === Infinity ? "∞" : payoff.toFixed(2) };
+      }
+
+      function renderPerf() {
+        const p = perfStats();
+        const rows = [["Profit Factor", p.pf], ["Expectancy", p.exp], ["Avg Win", p.aw], ["Avg Loss", p.al], ["Best Trade", p.best], ["Worst Trade", p.worst], ["Current Streak", p.streak], ["Payoff Ratio", p.payoff]];
+        document.getElementById("performance").innerHTML = rows.map(([k, v]) => `<div class="perf-item"><div class="perf-k">${k}</div><div class="perf-v">${v}</div></div>`).join("");
+      }
+
+      function filterRows() {
+        const q = (document.getElementById("marketFilter").value || "").trim().toLowerCase();
+        if (!q) return { open: state.open || [], resolved: state.resolved || [] };
+        const hit = (r) => [r.question, r.outcome, r.side, r.close_reason, r.result_tag].filter(Boolean).join(" ").toLowerCase().includes(q);
+        return { open: (state.open || []).filter(hit), resolved: (state.resolved || []).filter(hit) };
+      }
+
+      function renderTables() {
+        const rows = filterRows();
+        document.getElementById("openCount").textContent = `${rows.open.length} rows`;
+        document.getElementById("resolvedCount").textContent = `${rows.resolved.length} rows`;
+        document.getElementById("openBody").innerHTML = rows.open.length
+          ? rows.open.map((p) => `<tr><td class="num">${p.position_id}</td><td class="market"><div>${short(p.question)}</div><div class="subt">${short(p.outcome, 24)}</div></td><td>${sideBadge(p.side)}</td><td class="num">${fmtFixed(p.size, 3)}</td><td class="num">${fmtFixed(p.entry_price, 4)}</td><td class="num">${fmtFixed(p.mark_price, 4)}</td><td class="num ${pnlClass(p.unrealized_pnl)}">${fmtMoney(p.unrealized_pnl)}</td><td><span class="tag open">${p.soft_stop_armed ? "Armed" : "Open"}</span></td></tr>`).join("")
+          : '<tr><td class="empty" colspan="8">No open positions.</td></tr>';
+        document.getElementById("resolvedBody").innerHTML = rows.resolved.length
+          ? rows.resolved.map((p) => `<tr><td class="num">${p.position_id}</td><td class="market"><div>${short(p.question)}</div><div class="subt">${short(p.outcome, 24)}</div></td><td>${sideBadge(p.side)}</td><td class="num">${fmtFixed(p.entry_price, 4)}</td><td class="num">${fmtFixed(p.exit_price, 4)}</td><td class="num ${pnlClass(p.realized_pnl)}">${fmtMoney(p.realized_pnl)}</td><td>${short(p.close_reason || "-", 18)}</td><td>${resultTag(p.result_tag)}</td></tr>`).join("")
+          : '<tr><td class="empty" colspan="8">No resolved positions.</td></tr>';
+      }
+
+      function renderAll() {
+        renderCards(); renderEquity(); renderAllocation(); renderPnlDist(); renderPerf(); renderTables();
+        const o = state.overview || {};
+        document.getElementById("lastUpdated").textContent = localTime(o.timestamp);
+        document.getElementById("modeText").textContent = o.dry_run ? "DRY RUN" : "LIVE";
+      }
+
+      async function fetchJson(url) {
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) throw new Error(`${url} -> ${res.status}`);
+        return res.json();
+      }
+
+      function setError(msg) {
+        const b = document.getElementById("errorBanner");
+        if (!msg) { b.hidden = true; b.textContent = ""; return; }
+        b.hidden = false; b.textContent = msg;
+      }
+
+      function resetBar() {
+        const bar = document.getElementById("refreshBar");
+        bar.style.animation = "none"; void bar.offsetWidth;
+        if (state.paused) return;
+        bar.style.animation = `countdown ${state.refreshMs}ms linear`;
+      }
+
+      async function refresh() {
+        try {
+          const [overview, open, resolved, equity] = await Promise.all([fetchJson("/api/overview"), fetchJson("/api/positions/open"), fetchJson("/api/positions/resolved"), fetchJson("/api/equity")]);
+          state.overview = overview; state.open = open; state.resolved = resolved; state.equity = equity;
+          renderAll(); setError(""); document.getElementById("connectionText").textContent = "Live stream"; resetBar();
+        } catch (err) {
+          document.getElementById("connectionText").textContent = "Reconnecting";
+          setError(`Dashboard refresh failed: ${err.message}`);
+        }
+      }
+
+      function restartAuto() {
+        if (state.timer) clearInterval(state.timer);
+        if (state.paused) return;
+        state.timer = setInterval(refresh, state.refreshMs);
+        resetBar();
+      }
+
+      function exportResolvedCsv() {
+        const rows = state.resolved || [];
+        if (!rows.length) return;
+        const cols = ["position_id", "question", "outcome", "side", "size", "entry_price", "exit_price", "realized_pnl", "result_tag", "close_reason", "opened_at", "closed_at"];
+        const csv = [cols.join(","), ...rows.map((r) => cols.map((c) => `"${String(r[c] == null ? "" : r[c]).replace(/"/g, '""')}"`).join(","))].join("\n");
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `resolved_positions_${new Date().toISOString().replace(/[:.]/g, "-")}.csv`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+      }
+
+      document.getElementById("marketFilter").addEventListener("input", renderTables);
+      document.getElementById("refreshSelect").addEventListener("change", (e) => { state.refreshMs = Number(e.target.value) || 2500; restartAuto(); });
+      document.getElementById("refreshToggle").addEventListener("click", () => { state.paused = !state.paused; document.getElementById("refreshToggle").textContent = state.paused ? "Resume Auto" : "Pause Auto"; restartAuto(); });
+      document.getElementById("manualRefresh").addEventListener("click", refresh);
+      document.getElementById("exportCsv").addEventListener("click", exportResolvedCsv);
+
+      refresh();
+      restartAuto();
+    </script>
+  </body>
+</html>

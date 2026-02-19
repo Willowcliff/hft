@@ -152,16 +152,19 @@ def extract_balance_number(payload: Any) -> float:
                 return value
         return 0.0
     if isinstance(payload, dict):
+        # Prefer explicit balance-like keys and do not scan every dict value:
+        # allowance payloads can contain huge integers that are not spendable balance.
         keys = ["balance", "availableBalance", "available_balance", "available", "amount", "value", "usdc"]
         for key in keys:
             if key in payload:
-                value = extract_balance_number(payload.get(key))
-                if value > 0:
-                    return value
-        for value in payload.values():
-            parsed = extract_balance_number(value)
-            if parsed > 0:
-                return parsed
+                return extract_balance_number(payload.get(key))
+
+        container_keys = ["data", "result", "wallet", "account", "collateral", "balances", "response"]
+        for key in container_keys:
+            if key in payload:
+                parsed = extract_balance_number(payload.get(key))
+                if parsed > 0:
+                    return parsed
     return 0.0
 
 
@@ -452,7 +455,7 @@ class PortfolioState:
 
     def set_live_balance(self, balance: float) -> None:
         with self._lock:
-            if balance > 0:
+            if balance >= 0:
                 self.live_usdc_balance = balance
                 if self.start_equity <= 0:
                     self.start_equity = balance
@@ -760,7 +763,13 @@ class ExecutionClient:
             signature_type=self.config.signature_type,
             funder=funder_arg,
         )
-        creds = self.client.create_or_derive_api_creds()
+        try:
+            # Most accounts already have API creds; derive first to avoid noisy create->400 fallback logs.
+            creds = self.client.derive_api_key()
+        except Exception:  # noqa: BLE001
+            creds = self.client.create_api_key()
+        if creds is None:
+            raise RuntimeError("Failed to obtain CLOB API credentials.")
         self.client.set_api_creds(creds)
         LOGGER.info("Authenticated CLOB client initialized.")
 
@@ -778,7 +787,7 @@ class ExecutionClient:
         params = BalanceAllowanceParams(asset_type=AssetType.COLLATERAL, signature_type=self.config.signature_type)
         response = self.client.get_balance_allowance(params)
         balance = extract_balance_number(response)
-        if balance > 0:
+        if balance >= 0:
             self._paper_balance = balance
         return self._paper_balance
 
@@ -852,7 +861,9 @@ class ExecutionClient:
 class PolymarketCopyTrader:
     def __init__(self, config: BotConfig) -> None:
         self.config = config
-        self.state = PortfolioState(start_balance=config.paper_start_balance)
+        # In live mode, anchor equity to the first fetched wallet balance instead of paper settings.
+        start_balance = config.paper_start_balance if config.dry_run else 0.0
+        self.state = PortfolioState(start_balance=start_balance)
         self.books: Dict[str, BookTop] = {}
         self.execution = ExecutionClient(config, book_provider=self.get_book_snapshot)
         self.http = requests.Session()
